@@ -4,7 +4,13 @@
  */
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000/api';
+// CRITICAL FIX: Dynamically determine API_BASE_URL
+// In development, Vite uses the .env file or falls back to localhost.
+// In Docker, the VITE_APP_BACKEND_URL environment variable is injected during build.
+const BACKEND_HOST = import.meta.env.VITE_APP_BACKEND_URL || 'http://localhost:8000';
+const API_BASE_URL = `${BACKEND_HOST}/api`; // Assuming all API endpoints are under /api
+
+console.log("Frontend API Base URL:", API_BASE_URL); // Debugging: Check this in browser console
 
 /**
  * Upload and analyze a UI design image
@@ -32,13 +38,15 @@ export const analyzeImage = async (file) => {
     return response.data;
   } catch (error) {
     if (error.response) {
-      // Server responded with error
-      throw new Error(error.response.data.detail || 'Server error occurred');
+      // Server responded with error (e.g., 4xx, 5xx)
+      throw new Error(error.response.data.detail || `Server error (${error.response.status}) occurred`);
     } else if (error.request) {
-      // Request made but no response
-      throw new Error('No response from server. Please ensure backend is running.');
+      // Request made but no response received (e.g., network error, backend down)
+      console.error("No response from server:", error.request);
+      throw new Error('No response from backend server. Please ensure the backend is running and accessible.');
     } else {
-      // Something else went wrong
+      // Something else went wrong (e.g., config error)
+      console.error("Axios request setup error:", error.message);
       throw new Error('Failed to send request: ' + error.message);
     }
   }
@@ -62,7 +70,7 @@ export const validateImage = async (file) => {
 
     return response.data;
   } catch (error) {
-    throw new Error(error.response?.data?.detail || 'Validation failed');
+    throw new Error(error.response?.data?.detail || 'Image validation failed');
   }
 };
 
@@ -72,9 +80,11 @@ export const validateImage = async (file) => {
  */
 export const checkBackendHealth = async () => {
   try {
-    const response = await axios.get('http://localhost:8000/');
+    // Health check hits the root of the backend host, not /api/
+    const response = await axios.get(`${BACKEND_HOST}/`); 
     return response.status === 200;
   } catch (error) {
+    console.error("Backend health check failed:", error);
     return false;
   }
 };

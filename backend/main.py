@@ -12,6 +12,27 @@ from services.image_validator import ImageValidator
 from services.ui_detector import UIDetector
 from services.code_generator import CodeGenerator
 from utils.image_processor import ImageProcessor
+from fastapi.middleware.cors import CORSMiddleware # <--- ADD THIS
+
+app = FastAPI()
+
+# <--- ADD THIS CORS CONFIGURATION ---
+origins = [
+    "*", # Allows all origins for development. Be more specific in production.
+    # "http://localhost:3000", # Can specify if you want to be stricter
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+  
+@app.get("/")
+def read_root():
+    return {"status": "ok"}
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

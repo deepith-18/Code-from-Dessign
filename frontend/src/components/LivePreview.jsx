@@ -1,56 +1,49 @@
-/**
- * LivePreview Component
- * Renders a live preview of the generated HTML/CSS
- * Fixed: Uses srcDoc to prevent Cross-Origin/Sandbox errors
- */
 import React from 'react';
 
 const LivePreview = ({ html, css }) => {
-  
-  // Helper: Extract body content if the backend sent a full <html> document
-  // otherwise just use the html string as is.
   const extractBodyContent = (htmlString) => {
     if (!htmlString) return '';
+    // If it's a full document, get body. If not, return whole string.
     const bodyMatch = htmlString.match(/<body[^>]*>([\s\S]*)<\/body>/i);
     return bodyMatch ? bodyMatch[1] : htmlString;
   };
 
-  // Prepare the full HTML string for the iframe
-  // We combine the CSS and HTML here securely
   const bodyContent = extractBodyContent(html);
   
   const srcDoc = `
     <!DOCTYPE html>
-    <html lang="en">
+    <html>
     <head>
       <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <style>
-        /* Reset margins for the preview */
-        body { margin: 0; padding: 0; font-family: sans-serif; }
-        /* Inject the generated CSS */
+        body { 
+          margin: 0; 
+          padding: 20px; 
+          font-family: 'Inter', sans-serif; 
+          background: white; 
+          color: #111;
+        }
         ${css || ''}
       </style>
     </head>
     <body>
-      ${bodyContent || '<div style="padding: 20px; color: #666;">Waiting for code...</div>'}
+      ${bodyContent || '<div style="color: #999;">Preview will appear here...</div>'}
     </body>
     </html>
   `;
 
   return (
-    <div className="preview-container-wrapper">
-      <div className="preview-header">
-        <h3>Live Preview</h3>
-        <p className="preview-hint">Interactive preview of generated code</p>
+    <div className="preview-container-wrapper" style={{ border: '1px solid #eee', borderRadius: '12px', overflow: 'hidden', background: 'white' }}>
+      <div className="preview-header" style={{ padding: '15px 20px', borderBottom: '1px solid #eee', background: '#fcfdfa' }}>
+        <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>Live Preview</h3>
+        <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#666' }}>Interactive rendering of your design</p>
       </div>
-      <div className="preview-frame">
+      <div className="preview-frame" style={{ height: '600px', width: '100%' }}>
         <iframe
           title="Live Preview"
           srcDoc={srcDoc}
           sandbox="allow-scripts" 
-          className="preview-iframe"
-          style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+          style={{ width: '100%', height: '100%', border: 'none' }}
         />
       </div>
     </div>
