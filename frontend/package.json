@@ -4,8 +4,10 @@
   "description": "Frontend for Code from Design - Convert UI mockups to code",
   "private": true,
   "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
     "axios": "^1.13.5",
     "framer-motion": "^12.34.0",
+    "lucide-react": "^0.564.0",
     "prismjs": "^1.30.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"

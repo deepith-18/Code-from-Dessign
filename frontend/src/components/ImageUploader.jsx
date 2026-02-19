@@ -12,22 +12,55 @@ const ImageUploader = ({ onImageSelect, isLoading }) => {
     }
   };
 
+  const handleClear = (e) => {
+    e.stopPropagation();
+    setPreview(null);
+    onImageSelect(null);
+  };
+
   return (
     <div className="uploader-wrapper">
-      <input ref={fileInputRef} type="file" onChange={handleInputChange} style={{ display: 'none' }} />
+      <input 
+        ref={fileInputRef} 
+        type="file" 
+        accept="image/*"
+        onChange={handleInputChange} 
+        style={{ display: 'none' }} 
+      />
 
       {!preview ? (
         <div className="upload-zone" onClick={() => fileInputRef.current.click()}>
-          <div className="folder-icon">📂</div>
-          <h3 style={{fontWeight: 800, fontSize: '24px', marginBottom: '10px'}}>Upload UI Design Image</h3>
-          <p style={{color: '#666'}}>Click to browse or drag and drop</p>
-          <p style={{fontSize: '12px', color: '#aaa', marginTop: '10px'}}>PNG, JPG, JPEG, or WebP (max 10MB)</p>
+          <div className="folder-icon-container">
+            {/* Professional Folder SVG */}
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M10 4H4C2.89543 4 2 4.89543 2 6V18C2 19.1046 2.89543 20 4 20H20C21.1046 20 22 19.1046 22 18V8C22 6.89543 21.1046 6 20 6H12L10 4Z" fill="#FFC107"/>
+            </svg>
+          </div>
+          <h3>Upload UI Design Image</h3>
+          <p>Click to browse or drag and drop</p>
+          <p className="upload-hint">PNG, JPG, JPEG, or WebP (max 10MB)</p>
         </div>
       ) : (
-        <div className="preview-container" style={{textAlign: 'center'}}>
-          <img src={preview} alt="Preview" style={{maxWidth: '100%', borderRadius: '12px', border: '1px solid #eee'}} />
+        <div className="preview-container">
+          <div className="image-preview-wrapper">
+            <img src={preview} alt="Preview" />
+          </div>
           {!isLoading && (
-            <button className="btn-outline" style={{marginTop: '20px'}} onClick={() => {setPreview(null); onImageSelect(null)}}>
+            <button 
+              className="btn-outline" 
+              style={{
+                marginTop: '20px', 
+                width: '100%', 
+                padding: '12px', 
+                borderRadius: '12px', 
+                border: '1px solid #eee', 
+                background: 'white', 
+                fontWeight: '700', 
+                cursor: 'pointer',
+                color: '#ff4444'
+              }} 
+              onClick={handleClear}
+            >
               ✕ Remove Image
             </button>
           )}

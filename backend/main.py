@@ -1,200 +1,88 @@
-"""
-FastAPI Backend for Code from Design
-Main application entry point
-"""
+import os
+import uuid
+import shutil
+import logging
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-import logging
 
 from models.schemas import AnalysisResponse
-from services.image_validator import ImageValidator
 from services.ui_detector import UIDetector
 from services.code_generator import CodeGenerator
 from utils.image_processor import ImageProcessor
-from fastapi.middleware.cors import CORSMiddleware # <--- ADD THIS
 
-app = FastAPI()
-
-# <--- ADD THIS CORS CONFIGURATION ---
-origins = [
-    "*", # Allows all origins for development. Be more specific in production.
-    # "http://localhost:3000", # Can specify if you want to be stricter
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-  
-@app.get("/")
-def read_root():
-    return {"status": "ok"}
-
-# Configure logging
+# Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize FastAPI app
-app = FastAPI(
-    title="Code from Design API",
-    description="Convert UI design images to HTML, CSS, and React code",
-    version="1.0.0"
-)
+app = FastAPI(title="Code From Design (Local AI Edition)")
 
-# Configure CORS for frontend
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],  # React dev servers
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Initialize services
+# Initialize Services
 image_processor = ImageProcessor()
-validator = ImageValidator()
 detector = UIDetector()
-generator = CodeGenerator()
+generator = CodeGenerator() 
 
+TEMP_DIR = "temp_uploads"
+os.makedirs(TEMP_DIR, exist_ok=True)
 
 @app.get("/")
 async def root():
-    """Health check endpoint"""
-    return {
-        "message": "Code from Design API",
-        "status": "running",
-        "version": "1.0.0"
-    }
-
+    return {"status": "online", "engine": "Ollama (Local)"}
 
 @app.post("/api/analyze", response_model=AnalysisResponse)
 async def analyze_image(file: UploadFile = File(...)):
-    """
-    Main endpoint: Analyze uploaded image and generate code
-    
-    Process Flow:
-    1. Read uploaded image
-    2. Validate it's a UI design (not a photo/irrelevant image)
-    3. If valid:
-       a. Detect UI elements
-       b. Generate HTML/CSS/React code
-       c. Return structured response
-    4. If invalid:
-       a. Return error message
-    
-    Args:
-        file: Uploaded image file
-        
-    Returns:
-        AnalysisResponse with validation status and generated code
-    """
+    temp_path = None
     try:
-        logger.info(f"Received upload: {file.filename}")
+        # 1. Save file locally
+        file_ext = os.path.splitext(file.filename)[1]
+        temp_filename = f"{uuid.uuid4()}{file_ext}"
+        temp_path = os.path.join(TEMP_DIR, temp_filename)
         
-        # Step 1: Read image file
-        contents = await file.read()
+        with open(temp_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        # 2. Traditional CV Detection (Pre-processing)
+        with open(temp_path, "rb") as f:
+            contents = f.read()
+            image_cv = image_processor.load_image_from_bytes(contents)
+
+        elements = detector.detect_elements(image_cv)
         
-        if len(contents) == 0:
-            raise HTTPException(status_code=400, detail="Empty file uploaded")
+        # 3. Generate Code using Local Ollama
+        # Note: This might take 30-60 seconds on a laptop CPU
+        generated_code = generator.generate(temp_path, elements)
         
-        # Step 2: Convert to OpenCV format
-        try:
-            image = image_processor.load_image_from_bytes(contents)
-            logger.info(f"Image loaded: {image.shape}")
-        except Exception as e:
-            logger.error(f"Failed to load image: {str(e)}")
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid image file. Please upload a valid PNG, JPG, or JPEG image."
-            )
-        
-        # Step 3: Validate image is a UI design
-        validation_result = validator.validate(image)
-        logger.info(f"Validation result: {validation_result.is_ui_design}, confidence: {validation_result.confidence}")
-        
-        # Step 4: If not a UI design, return error
-        if not validation_result.is_ui_design:
-            return AnalysisResponse(
-                valid=False,
-                message=validation_result.reason,
-                elements=None,
-                generated_code=None,
-                preview_data=None
-            )
-        
-        # Step 5: Detect UI elements
-        elements = detector.detect_elements(image)
-        logger.info(f"Detected {len(elements)} UI elements")
-        
-        # Step 6: Generate code from detected elements
-        generated_code = generator.generate(elements)
-        logger.info("Code generation complete")
-        
-        # Step 7: Prepare preview data
         preview_data = {
             "element_count": len(elements),
-            "element_types": {
-                "buttons": len([e for e in elements if e.type == 'button']),
-                "inputs": len([e for e in elements if e.type == 'input']),
-                "text": len([e for e in elements if e.type == 'text']),
-                "containers": len([e for e in elements if e.type == 'container']),
-                "images": len([e for e in elements if e.type == 'image']),
-            },
-            "validation_metrics": validation_result.metrics
+            "engine": "Ollama CPU"
         }
-        
-        # Step 8: Return success response
+
+        # Cleanup
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
         return AnalysisResponse(
             valid=True,
-            message="UI design successfully analyzed and code generated!",
+            message="Local Analysis Complete",
             elements=elements,
             generated_code=generated_code,
             preview_data=preview_data
         )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Internal server error: {str(e)}"
-        )
 
-
-@app.post("/api/validate")
-async def validate_only(file: UploadFile = File(...)):
-    """
-    Endpoint to only validate if image is a UI design
-    Useful for quick checks without full processing
-    
-    Args:
-        file: Uploaded image file
-        
-    Returns:
-        Validation result with metrics
-    """
-    try:
-        contents = await file.read()
-        image = image_processor.load_image_from_bytes(contents)
-        
-        validation_result = validator.validate(image)
-        
-        return {
-            "is_ui_design": validation_result.is_ui_design,
-            "confidence": validation_result.confidence,
-            "reason": validation_result.reason,
-            "metrics": validation_result.metrics
-        }
-        
     except Exception as e:
-        logger.error(f"Validation error: {str(e)}")
+        if temp_path and os.path.exists(temp_path):
+            try: os.remove(temp_path)
+            except: pass
+        logger.error(f"Endpoint Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 if __name__ == "__main__":
     import uvicorn
